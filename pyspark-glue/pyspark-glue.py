@@ -52,4 +52,9 @@ orders_dyf = glueContext.create_dynamic_frame.from_catalog(database = 'pyspark_t
 orders_dyf.show(10)
 print('Schema for orders:')
 orders_dyf.printSchema()
+customers_dyf = dyf
+dyfjoin = customers_dyf.join(paths1 = ['customerid'], paths2 = ['customerid'], frame2 = orders_dyf)
+dyfjoin.show()
+dyfjoin.printSchema()
+dyfjoin.toDF().show()
 job.commit()
