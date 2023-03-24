@@ -57,4 +57,85 @@ dyfjoin = customers_dyf.join(paths1 = ['customerid'], paths2 = ['customerid'], f
 dyfjoin.show()
 dyfjoin.printSchema()
 dyfjoin.toDF().show()
+glueContext.write_dynamic_frame.from_options(
+                            frame = customers_dyf,
+                            connection_type = 's3',
+                            connection_options = {"path": "s3://pyspark-glue-s3/temp_sink"},
+                            format = 'csv',
+                            format_options = {
+                                'separator':',',
+                                'optimizePerformance':True
+                            },
+                            transformation_ctx = 'writing_to_s3'
+)
+glueContext.write_dynamic_frame.from_options(
+                            frame = customers_dyf,
+                            connection_type = 's3',
+                            connection_options = {"path": "s3://pyspark-glue-s3/temp_sink/"},
+                            format = "csv",
+                            format_options = {
+                                'separator':','
+                            },
+                            transformation_ctx = 'writing_to_s3'
+)
+glueContext.write_dynamic_frame.from_catalog(
+    frame = customers_dyf,
+    name_space = "pyspark_tutorial_db",
+    table_name = "customers_write_dyf"
+)
+sparkDF = dyf.toDF()
+sparkDF.show()
+dfselect = sparkDF.select("customerid", "fullname")
+dfselect.show()
+# creating a new column 
+from pyspark.sql.functions import lit
+
+# add new column with literal value
+dfNewColumn = sparkDF.withColumn("date", lit("2023-03-23"))
+dfNewColumn.show()
+# create a new column and add two strings together
+from pyspark.sql.functions import concat
+
+dfNewFullName = sparkDF.withColumn("new_full_name", concat("firstname",concat(lit(" "), "lastname")))
+dfNewFullName.show()
+# drop columns 
+dfDropCol = sparkDF.drop("firstname","lastname")
+dfDropCol.show()
+# renaming columns
+dfRenameCols = sparkDF.withColumnRenamed("fullname","full_name_new").show()
+# grouping df
+sparkDF.groupBy("lastname").count().show()
+# filter on lastname Adams
+sparkDF.filter(sparkDF["lastname"] == "Adams").show()
+sparkDF.filter("lastname = 'Adams'").show()
+sparkDF.filter(sparkDF.lastname == "Adams").show()
+sparkDF.where(sparkDF.lastname == "Adams").show()
+sparkDF.where("lastname = 'Adams'").show()
+# Joining spark dataframes
+
+df_orders = orders_dyf.toDF()
+sparkDF.join(other = df_orders, on = sparkDF.customerid == df_orders.customerid).show()
+# Import Dynamic DataFrame class
+from awsglue.dynamicframe import DynamicFrame
+
+#Convert from Spark Data Frame to Glue Dynamic Frame
+dyfCustomersConvert = DynamicFrame.fromDF(sparkDF, glueContext, "convert")
+
+#Show converted Glue Dynamic Frame
+dyfCustomersConvert.show()
+# write down the data in converted Dynamic Frame to S3 location. 
+glueContext.write_dynamic_frame.from_options(
+                            frame = dyfCustomersConvert,
+                            connection_type="s3", 
+                            connection_options = {"path": "s3://pyspark-glue-s3/customers_write_dyf/"}, 
+                            format = "csv", 
+                            format_options={
+                                "separator": ","
+                                },
+                            transformation_ctx = "datasink2")
+# write data from the converted to customers_write_dyf table using the meta data stored in the glue data catalog 
+glueContext.write_dynamic_frame.from_catalog(
+    frame = dyfCustomersConvert,
+    database = "pyspark_tutorial_db",  
+    table_name = "customers_write_dyf")
 job.commit()
